@@ -956,22 +956,42 @@
     tryAutoplay();
   }, { once: true });
 
+  const mediaErrorNames = {
+    1: 'MEDIA_ERR_ABORTED (loading was aborted)',
+    2: 'MEDIA_ERR_NETWORK (a network error interrupted the download)',
+    3: 'MEDIA_ERR_DECODE (the browser could not decode this file — likely corrupted or an unsupported encoding)',
+    4: 'MEDIA_ERR_SRC_NOT_SUPPORTED (the server response is not a format the browser recognizes as audio — check Content-Type)'
+  };
+
   bgAudio.addEventListener('error', () => {
-    // fetch the same URL directly so we get a real HTTP status back, not just "it failed"
+    const mediaErr = bgAudio.error;
+    console.warn('[bg music] <audio> element error code:', mediaErr ? mediaErr.code : 'unknown',
+      '—', mediaErr ? (mediaErrorNames[mediaErr.code] || 'unrecognized error code') : 'no MediaError object');
+
+    // cross-check with the actual HTTP response: status, content-type, content-length
     fetch('bg.mp3', { cache: 'no-store' })
       .then((res) => {
-        console.warn('[bg music] bg.mp3 request returned HTTP', res.status,
-          '— the file is not being served at this path on the deployed site. ' +
-          'Check: (1) the deploy actually includes bg.mp3, (2) it is not in .gitignore, ' +
-          '(3) the Vercel project has redeployed since the file was added, ' +
-          '(4) the project is not a framework preset that only serves files from a public/ folder.');
+        console.warn('[bg music] HTTP status:', res.status,
+          '| Content-Type:', res.headers.get('content-type'),
+          '| Content-Length:', res.headers.get('content-length'), 'bytes');
+        if (res.status !== 200) {
+          console.warn('[bg music] Not a 200 — file is not being served at this path.');
+        } else if (!/^audio\//.test(res.headers.get('content-type') || '')) {
+          console.warn('[bg music] Content-Type is not audio/* — the host is serving this file with the wrong MIME type, which is likely why the <audio> tag rejects it even though the URL loads.');
+        } else if (Number(res.headers.get('content-length')) < 10000) {
+          console.warn('[bg music] File is suspiciously small for an audio track — it may be corrupted, empty, or a Git LFS pointer file instead of the real MP3.');
+        } else {
+          console.warn('[bg music] Status and headers look fine — the file itself may be corrupted. Try re-exporting/re-uploading the MP3.');
+        }
       })
       .catch((err) => {
         console.error('[bg music] Could not even reach bg.mp3 — network/CORS issue:', err);
       });
+
     audioToggle.style.opacity = '0.35';
-    audioToggle.setAttribute('title', 'Music file not found — see console for details (F12)');
+    audioToggle.setAttribute('title', 'Music file could not be decoded — see console for details (F12)');
   }, { once: true });
+
 
   function updateMuteIcon(){
     const muted = bgAudio.muted || bgAudio.volume === 0;
