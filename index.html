@@ -45,6 +45,13 @@
     -webkit-font-smoothing:antialiased;
     overflow-x:hidden;
   }
+  
+  /* Lock scrolling during intro */
+  body.no-scroll {
+    overflow: hidden;
+    height: 100vh;
+  }
+
   ::selection{ background:var(--violet); color:var(--paper); }
 
   a{ color:inherit; text-decoration:none; }
@@ -58,6 +65,56 @@
     border-radius:2px;
   }
 
+  /* ---------- INTRO OVERLAY ---------- */
+  #introOverlay {
+    position: fixed;
+    inset: 0;
+    background: var(--ink);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--edge);
+    transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1);
+  }
+  #introOverlay.hide {
+    transform: translateY(-100%);
+  }
+  #introText {
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: clamp(14px, 3.5vw, 24px);
+    font-weight: 700;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+  .intro-char {
+    opacity: 0;
+    display: inline-block;
+    white-space: pre;
+    will-change: transform;
+  }
+  #introText::after {
+    content: '|';
+    animation: blink 1s step-end infinite;
+    color: var(--coral);
+    margin-left: 4px;
+  }
+  #introText.done::after {
+    display: none;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes waveAnim {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); color: var(--coral); }
+  }
+  .intro-char.wave {
+    animation: waveAnim 0.6s ease-in-out;
+  }
+
+  /* ---------- BASE LAYOUT ---------- */
   .skip-link{
     position:absolute; left:-9999px; top:0;
     background:var(--violet); color:var(--paper); padding:10px 18px; z-index:200;
@@ -559,10 +616,18 @@
     .marquee-track{ animation:none; }
     .reveal{ opacity:1; transform:none; transition:none; }
     .btn-primary:hover, .btn-ghost:hover, .other-card:hover{ transform:none; box-shadow:none; }
+    #introOverlay { opacity: 0; pointer-events: none; transition: none; display: none; }
+    body.no-scroll { overflow: auto; height: auto; }
   }
 </style>
 </head>
-<body>
+<!-- Lock scroll on load -->
+<body class="no-scroll">
+
+<!-- Intro Overlay -->
+<div id="introOverlay">
+  <div id="introText"></div>
+</div>
 
 <a href="#main" class="skip-link">Skip to content</a>
 
@@ -892,6 +957,71 @@
 </footer>
 
 <script>
+  // ---------- INTRO ANIMATION ----------
+  (function initIntro() {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const overlay = document.getElementById('introOverlay');
+    
+    // Skip intro if user prefers reduced motion
+    if (reducedMotion) {
+      document.body.classList.remove('no-scroll');
+      if (overlay) overlay.remove();
+      return;
+    }
+
+    const textStr = "I could've made a normal portfolio. Anyway…";
+    const textContainer = document.getElementById('introText');
+    
+    // Create span for each character for fine control
+    textStr.split('').forEach(char => {
+      const span = document.createElement('span');
+      span.textContent = char;
+      span.className = 'intro-char';
+      textContainer.appendChild(span);
+    });
+
+    const chars = document.querySelectorAll('.intro-char');
+    let delay = 300; // Initial pause before typing starts
+    
+    // 1. Typing Effect
+    chars.forEach((char) => {
+      setTimeout(() => {
+        char.style.opacity = '1';
+      }, delay);
+      delay += 40; // typing speed
+    });
+
+    // 2. Pause before the wave
+    const pauseBeforeWave = 600;
+    delay += pauseBeforeWave;
+
+    // 3. Wavy Effect
+    setTimeout(() => {
+      textContainer.classList.add('done'); // removes blinking cursor
+      chars.forEach((char, i) => {
+        setTimeout(() => {
+          char.classList.add('wave');
+        }, i * 35); // stagger the wave across the letters
+      });
+    }, delay);
+
+    // 4. Slide overlay up and unlock scroll
+    const totalWaveTime = chars.length * 35 + 600; // wave stagger time + CSS animation duration
+    delay += totalWaveTime + 300; // add a little buffer before hiding
+    
+    setTimeout(() => {
+      overlay.classList.add('hide');
+      document.body.classList.remove('no-scroll');
+      
+      // Cleanup DOM
+      setTimeout(() => {
+        overlay.remove();
+      }, 800); // match CSS transition duration
+    }, delay);
+  })();
+
+  // ---------- EXISTING SCRIPTS ----------
+
   // mobile nav toggle
   const navToggle = document.getElementById('navToggle');
   const navLinks = document.getElementById('navLinks');
