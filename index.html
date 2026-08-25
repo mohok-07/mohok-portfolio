@@ -122,14 +122,17 @@
   }
   nav.links a:hover, nav.links a:focus-visible{ color:var(--ink); }
   nav.links a:hover::after, nav.links a:focus-visible::after{ width:100%; }
-  .nav-cta{
+  
+  nav.links a.nav-cta{
     font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:0.04em;
     background:var(--ink); color:var(--paper); padding:10px 20px; border-radius:100px;
     white-space:nowrap; flex-shrink:0; line-height:1;
-    transition:background .25s ease, transform .25s ease;
+    transition:background .25s ease, transform .25s ease, color .25s ease;
   }
-  .nav-cta:hover{ background:var(--violet); transform:translateY(-2px); }
-  .nav-cta::after{ display:none; }
+  nav.links a.nav-cta:hover, nav.links a.nav-cta:focus-visible{ 
+    background:var(--violet); color:var(--paper); transform:translateY(-2px); 
+  }
+  nav.links a.nav-cta::after{ display:none; }
 
   .nav-toggle{ display:none; }
 
@@ -298,7 +301,7 @@
     display:flex; align-items:center; gap:8px;
   }
   .rc-back{
-    position:absolute; inset:34px;
+    position:absolute; top:68px; left:34px; right:34px; bottom:34px;
     opacity:0; transform:translateY(10px);
     pointer-events:none;
   }
@@ -563,7 +566,8 @@
 
 <a href="#main" class="skip-link">Skip to content</a>
 
-<audio id="bgAudio" loop preload="auto"></audio>
+<!-- Added 'muted' attribute here -->
+<audio id="bgAudio" loop preload="auto" muted></audio>
 
 <div class="audio-widget">
   <button class="audio-toggle" id="audioToggle" type="button" aria-label="Mute background music" aria-pressed="false">
@@ -948,12 +952,14 @@
   const volLabel = document.getElementById('volLabel');
 
   bgAudio.volume = 0.10;
+  bgAudio.muted = true; // start muted
   bgAudio.src = 'bg.mp3';
   bgAudio.load();
 
   bgAudio.addEventListener('canplay', () => {
     console.info('[bg music] Loaded fine from:', bgAudio.currentSrc);
-    tryAutoplay();
+    // Since it's muted, autoplay will succeed instantly
+    bgAudio.play().catch(err => console.warn('[bg music] Play failed:', err));
   }, { once: true });
 
   const mediaErrorNames = {
@@ -1001,19 +1007,6 @@
     audioToggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
   }
   updateMuteIcon();
-
-  function tryAutoplay(){
-    bgAudio.play().catch(() => {
-      // autoplay blocked — start on the visitor's first interaction instead
-      const startOnInteract = () => {
-        bgAudio.play().catch((err) => console.warn('[bg music] play() failed:', err));
-        document.removeEventListener('click', startOnInteract);
-        document.removeEventListener('keydown', startOnInteract);
-      };
-      document.addEventListener('click', startOnInteract, { once: true });
-      document.addEventListener('keydown', startOnInteract, { once: true });
-    });
-  }
 
   audioToggle.addEventListener('click', () => {
     bgAudio.muted = !bgAudio.muted;
