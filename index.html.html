@@ -124,7 +124,8 @@
   nav.links a:hover::after, nav.links a:focus-visible::after{ width:100%; }
   .nav-cta{
     font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:0.04em;
-    background:var(--ink); color:var(--paper); padding:9px 18px; border-radius:100px;
+    background:var(--ink); color:var(--paper); padding:10px 20px; border-radius:100px;
+    white-space:nowrap; flex-shrink:0; line-height:1;
     transition:background .25s ease, transform .25s ease;
   }
   .nav-cta:hover{ background:var(--violet); transform:translateY(-2px); }
@@ -518,6 +519,38 @@
     .blob-1, .blob-2{ width:220px; height:220px; }
   }
 
+  /* ---------- AUDIO WIDGET ---------- */
+  .audio-widget{
+    position:fixed; right:22px; bottom:22px; z-index:150;
+    display:flex; align-items:center; gap:12px;
+    background:var(--paper);
+    border:2px solid var(--ink);
+    border-radius:100px;
+    padding:10px 18px 10px 10px;
+    box-shadow:4px 4px 0 var(--violet);
+  }
+  .audio-toggle{
+    width:34px; height:34px; border-radius:50%;
+    background:var(--ink); color:var(--paper);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+    transition:background .2s ease;
+  }
+  .audio-toggle:hover{ background:var(--coral); }
+  .audio-toggle svg{ width:16px; height:16px; }
+  .audio-widget .vol-label{
+    font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--muted);
+    letter-spacing:0.04em; width:26px; text-align:right; flex-shrink:0;
+  }
+  .audio-widget input[type="range"]{
+    width:92px; accent-color:var(--coral);
+    cursor:pointer;
+  }
+  @media (max-width:520px){
+    .audio-widget{ right:14px; bottom:14px; padding:8px 14px 8px 8px; }
+    .audio-widget input[type="range"]{ width:64px; }
+  }
+
   @media (prefers-reduced-motion: reduce){
     html{ scroll-behavior:auto; }
     .marquee-track{ animation:none; }
@@ -529,6 +562,25 @@
 <body>
 
 <a href="#main" class="skip-link">Skip to content</a>
+
+<audio id="bgAudio" src="bg.mp3" loop preload="auto"></audio>
+
+<div class="audio-widget">
+  <button class="audio-toggle" id="audioToggle" type="button" aria-label="Mute background music" aria-pressed="false">
+    <svg id="iconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+    </svg>
+    <svg id="iconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <line x1="23" y1="9" x2="17" y2="15"></line>
+      <line x1="17" y1="9" x2="23" y2="15"></line>
+    </svg>
+  </button>
+  <input type="range" id="volumeSlider" min="0" max="100" value="25" aria-label="Background music volume">
+  <span class="vol-label" id="volLabel">25%</span>
+</div>
 
 <header class="site">
   <div class="nav-inner">
@@ -886,6 +938,54 @@
       card.style.setProperty('--my', (e.clientY - rect.top) + 'px');
     });
   }
+
+  // background music
+  const bgAudio = document.getElementById('bgAudio');
+  const audioToggle = document.getElementById('audioToggle');
+  const iconOn = document.getElementById('iconOn');
+  const iconOff = document.getElementById('iconOff');
+  const volumeSlider = document.getElementById('volumeSlider');
+  const volLabel = document.getElementById('volLabel');
+
+  bgAudio.volume = 0.25;
+
+  function updateMuteIcon(){
+    const muted = bgAudio.muted || bgAudio.volume === 0;
+    iconOn.style.display = muted ? 'none' : 'block';
+    iconOff.style.display = muted ? 'block' : 'none';
+    audioToggle.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    audioToggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
+  }
+  updateMuteIcon();
+
+  function tryAutoplay(){
+    bgAudio.play().catch(() => {
+      // autoplay blocked — start on the visitor's first interaction instead
+      const startOnInteract = () => {
+        bgAudio.play().catch(() => {});
+        document.removeEventListener('click', startOnInteract);
+        document.removeEventListener('keydown', startOnInteract);
+      };
+      document.addEventListener('click', startOnInteract, { once: true });
+      document.addEventListener('keydown', startOnInteract, { once: true });
+    });
+  }
+  window.addEventListener('load', tryAutoplay);
+
+  audioToggle.addEventListener('click', () => {
+    bgAudio.muted = !bgAudio.muted;
+    if (!bgAudio.muted && bgAudio.paused) bgAudio.play().catch(() => {});
+    updateMuteIcon();
+  });
+
+  volumeSlider.addEventListener('input', (e) => {
+    const val = Number(e.target.value);
+    bgAudio.volume = val / 100;
+    bgAudio.muted = val === 0;
+    volLabel.textContent = val + '%';
+    updateMuteIcon();
+    if (val > 0 && bgAudio.paused) bgAudio.play().catch(() => {});
+  });
 
   // hero word cycler
   const words = ['building', 'debugging', 'shipping', 'learning', 'occasionally vanishing a coin'];
