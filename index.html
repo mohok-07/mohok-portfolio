@@ -578,8 +578,8 @@
       <line x1="17" y1="9" x2="23" y2="15"></line>
     </svg>
   </button>
-  <input type="range" id="volumeSlider" min="0" max="100" value="25" aria-label="Background music volume">
-  <span class="vol-label" id="volLabel">25%</span>
+  <input type="range" id="volumeSlider" min="0" max="100" value="10" aria-label="Background music volume">
+  <span class="vol-label" id="volLabel">10%</span>
 </div>
 
 <header class="site">
@@ -947,7 +947,7 @@
   const volumeSlider = document.getElementById('volumeSlider');
   const volLabel = document.getElementById('volLabel');
 
-  bgAudio.volume = 0.25;
+  bgAudio.volume = 0.10;
   bgAudio.src = 'bg.mp3';
   bgAudio.load();
 
