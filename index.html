@@ -65,7 +65,7 @@
     border-radius:2px;
   }
 
-  /* ---------- INTRO OVERLAY ---------- */
+  /* ---------- INTRO OVERLAY (NEW) ---------- */
   #introOverlay {
     position: fixed;
     inset: 0;
@@ -76,42 +76,43 @@
     justify-content: center;
     padding: var(--edge);
     transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1);
+    will-change: transform;
   }
   #introOverlay.hide {
     transform: translateY(-100%);
   }
   #introText {
-    color: var(--paper);
     font-family: var(--mono);
-    font-size: clamp(14px, 3.5vw, 24px);
+    font-size: clamp(14px, 3.2vw, 21px);
     font-weight: 700;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
     text-align: center;
+    max-width: 900px;
+    line-height: 1.8;
   }
-  .intro-char {
-    opacity: 0;
+  .intro-word {
     display: inline-block;
-    white-space: pre;
-    will-change: transform;
+    white-space: nowrap;
+    margin-right: 0.3em;
   }
-  #introText::after {
-    content: '|';
-    animation: blink 1s step-end infinite;
-    color: var(--coral);
-    margin-left: 4px;
+  .intro-char-wrapper {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(12px) scale(0.96) skewX(5deg);
+    filter: blur(5px);
+    transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+                transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+                filter 0.7s ease-out;
+    will-change: opacity, transform, filter;
   }
-  #introText.done::after {
-    display: none;
+  .intro-char-wrapper.revealed {
+    opacity: 1;
+    transform: translateY(0) scale(1) skewX(0);
+    filter: blur(0);
   }
-  @keyframes blink { 50% { opacity: 0; } }
-  @keyframes waveAnim {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-12px); color: var(--coral); }
-  }
-  .intro-char.wave {
-    animation: waveAnim 0.6s ease-in-out;
+  .intro-char-inner {
+    display: inline-block;
+    color: var(--paper);
+    will-change: transform, color;
   }
 
   /* ---------- BASE LAYOUT ---------- */
@@ -624,7 +625,7 @@
 <!-- Lock scroll on load -->
 <body class="no-scroll">
 
-<!-- Intro Overlay -->
+<!-- Custom Liquid Intro Overlay -->
 <div id="introOverlay">
   <div id="introText"></div>
 </div>
@@ -957,12 +958,12 @@
 </footer>
 
 <script>
-  // ---------- INTRO ANIMATION ----------
+  // ---------- CUSTOM LIQUID INTRO ANIMATION ----------
   (function initIntro() {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const overlay = document.getElementById('introOverlay');
     
-    // Skip intro if user prefers reduced motion
+    // Fallback immediately if user prefers reduced motion
     if (reducedMotion) {
       document.body.classList.remove('no-scroll');
       if (overlay) overlay.remove();
@@ -971,53 +972,132 @@
 
     const textStr = "I could've made a normal portfolio. Anyway…";
     const textContainer = document.getElementById('introText');
+    const words = textStr.split(' ');
     
-    // Create span for each character for fine control
-    textStr.split('').forEach(char => {
-      const span = document.createElement('span');
-      span.textContent = char;
-      span.className = 'intro-char';
-      textContainer.appendChild(span);
-    });
+    // Store elements to run the JS wave math against
+    const charData = [];
 
-    const chars = document.querySelectorAll('.intro-char');
-    let delay = 300; // Initial pause before typing starts
-    
-    // 1. Typing Effect
-    chars.forEach((char) => {
-      setTimeout(() => {
-        char.style.opacity = '1';
-      }, delay);
-      delay += 40; // typing speed
-    });
-
-    // 2. Pause before the wave
-    const pauseBeforeWave = 600;
-    delay += pauseBeforeWave;
-
-    // 3. Wavy Effect
-    setTimeout(() => {
-      textContainer.classList.add('done'); // removes blinking cursor
-      chars.forEach((char, i) => {
-        setTimeout(() => {
-          char.classList.add('wave');
-        }, i * 35); // stagger the wave across the letters
-      });
-    }, delay);
-
-    // 4. Slide overlay up and unlock scroll
-    const totalWaveTime = chars.length * 35 + 600; // wave stagger time + CSS animation duration
-    delay += totalWaveTime + 300; // add a little buffer before hiding
-    
-    setTimeout(() => {
-      overlay.classList.add('hide');
-      document.body.classList.remove('no-scroll');
+    // 1. Build the nested spans for independent Transition + Transform control
+    words.forEach((word) => {
+      const wordSpan = document.createElement('span');
+      wordSpan.className = 'intro-word';
       
-      // Cleanup DOM
-      setTimeout(() => {
-        overlay.remove();
-      }, 800); // match CSS transition duration
-    }, delay);
+      word.split('').forEach((char) => {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'intro-char-wrapper';
+        
+        const inner = document.createElement('span');
+        inner.textContent = char;
+        inner.className = 'intro-char-inner';
+        
+        wrapper.appendChild(inner);
+        wordSpan.appendChild(wrapper);
+        charData.push({ wrapper, inner });
+      });
+      textContainer.appendChild(wordSpan);
+    });
+
+    let startTime;
+    let rAF;
+    
+    // Intro Sequence Timings
+    const BLACK_SCREEN_DUR = 250; 
+    const WAVE_START = 700;       
+    const WAVE_DUR = 1200;        
+    const PAUSE_BEFORE_EXIT = 250;
+    const TOTAL_ANIM_TIME = WAVE_START + WAVE_DUR + PAUSE_BEFORE_EXIT;
+
+    // Trigger the staggered blur reveal
+    setTimeout(() => {
+      charData.forEach((data, i) => {
+        setTimeout(() => {
+          data.wrapper.classList.add('revealed');
+        }, i * 14); // Very tight stagger for a smooth emergence
+      });
+    }, BLACK_SCREEN_DUR);
+
+    // Grab horizontal screen positions slightly after append
+    setTimeout(() => {
+      charData.forEach((data) => {
+        const rect = data.inner.getBoundingClientRect();
+        data.x = rect.left + rect.width / 2;
+      });
+      startTime = performance.now();
+      rAF = requestAnimationFrame(renderWave);
+    }, 50);
+
+    // 2. High-Performance Liquid Math Loop
+    function renderWave(now) {
+      const elapsed = now - startTime;
+      
+      if (elapsed > WAVE_START && elapsed < WAVE_START + WAVE_DUR) {
+        
+        const screenW = window.innerWidth;
+        const maxAmp = screenW < 600 ? 10 : 15; // smaller wave on mobile
+        
+        const waveProgress = (elapsed - WAVE_START) / WAVE_DUR; // 0.0 to 1.0
+        // Wave travels from left boundary to slightly past right boundary
+        const waveCenter = waveProgress * (screenW + 500) - 250; 
+        const waveWidth = Math.min(screenW * 0.45, 450); 
+        
+        const globalPhase = elapsed * 0.007; // Speed of the internal liquid ripples
+        const freq = 0.012;                  // Wavelength stretching across the text
+
+        charData.forEach((data) => {
+          const dist = data.x - waveCenter;
+          const norm = dist / (waveWidth / 2);
+          
+          if (norm > -1 && norm < 1) {
+            // Cosine squared envelope creates a localized "bump" window
+            const envelope = Math.pow(Math.cos(norm * Math.PI / 2), 2);
+            
+            // Continuous sine wave creates fluid, connected liquid behavior
+            const sineVal = Math.sin(data.x * freq - globalPhase);
+            const cosVal = Math.cos(data.x * freq - globalPhase);
+            
+            const y = sineVal * -maxAmp * envelope; // negative is UP
+            const rot = cosVal * 3 * envelope;
+            const scale = 1 + (0.015 * envelope * sineVal);
+            
+            // Highlight accent peaks with a subtle coral shift
+            const colorMix = envelope * Math.max(0, sineVal) * 0.45;
+
+            data.inner.style.transform = `translateY(${y}px) rotate(${rot}deg) scale(${scale})`;
+            
+            if (colorMix > 0.01) {
+              // Interpolating towards Coral (255, 90, 54)
+              data.inner.style.color = `rgb(${Math.round(250 + 5 * colorMix)}, ${Math.round(249 - 159 * colorMix)}, ${Math.round(246 - 192 * colorMix)})`;
+            } else {
+              data.inner.style.color = '';
+            }
+          } else {
+            // Clean up outside the moving window
+            data.inner.style.transform = 'translateY(0px) rotate(0deg) scale(1)';
+            data.inner.style.color = '';
+          }
+        });
+      }
+
+      if (elapsed < TOTAL_ANIM_TIME) {
+        rAF = requestAnimationFrame(renderWave);
+      } else {
+        // 3. The Slide-Up Reveal
+        cancelAnimationFrame(rAF);
+        
+        // Final style cleanup to ensure exact layout precision
+        charData.forEach((data) => {
+          data.inner.style.transform = '';
+          data.inner.style.color = '';
+        });
+
+        overlay.classList.add('hide');
+        document.body.classList.remove('no-scroll');
+        
+        setTimeout(() => {
+          overlay.remove();
+        }, 850); // Matches CSS transition duration
+      }
+    }
   })();
 
   // ---------- EXISTING SCRIPTS ----------
@@ -1154,15 +1234,15 @@
   });
 
   // hero word cycler
-  const words = ['building', 'debugging', 'shipping', 'learning', 'occasionally vanishing a coin'];
+  const wordsHero = ['building', 'debugging', 'shipping', 'learning', 'occasionally vanishing a coin'];
   const cycleEl = document.getElementById('cycleWord');
   if (cycleEl && !reducedMotion) {
     let i = 0;
     setInterval(() => {
-      i = (i + 1) % words.length;
+      i = (i + 1) % wordsHero.length;
       cycleEl.style.opacity = 0;
       setTimeout(() => {
-        cycleEl.textContent = words[i];
+        cycleEl.textContent = wordsHero[i];
         cycleEl.style.opacity = 1;
       }, 220);
     }, 2200);
