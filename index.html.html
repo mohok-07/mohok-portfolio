@@ -947,44 +947,55 @@
   const volumeSlider = document.getElementById('volumeSlider');
   const volLabel = document.getElementById('volLabel');
 
+  // Start silent/paused. Music begins only when the visitor clicks the button.
   bgAudio.volume = 0.25;
+  bgAudio.muted = false;
 
   function updateMuteIcon(){
-    const muted = bgAudio.muted || bgAudio.volume === 0;
-    iconOn.style.display = muted ? 'none' : 'block';
-    iconOff.style.display = muted ? 'block' : 'none';
-    audioToggle.setAttribute('aria-pressed', muted ? 'true' : 'false');
-    audioToggle.setAttribute('aria-label', muted ? 'Unmute background music' : 'Mute background music');
+    const playing = !bgAudio.paused && !bgAudio.muted && bgAudio.volume > 0;
+    iconOn.style.display = playing ? 'block' : 'none';
+    iconOff.style.display = playing ? 'none' : 'block';
+    audioToggle.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    audioToggle.setAttribute(
+      'aria-label',
+      playing ? 'Pause background music' : 'Play background music'
+    );
   }
+
   updateMuteIcon();
 
-  function tryAutoplay(){
-    bgAudio.play().catch(() => {
-      // autoplay blocked — start on the visitor's first interaction instead
-      const startOnInteract = () => {
-        bgAudio.play().catch(() => {});
-        document.removeEventListener('click', startOnInteract);
-        document.removeEventListener('keydown', startOnInteract);
-      };
-      document.addEventListener('click', startOnInteract, { once: true });
-      document.addEventListener('keydown', startOnInteract, { once: true });
-    });
-  }
-  window.addEventListener('load', tryAutoplay);
-
-  audioToggle.addEventListener('click', () => {
-    bgAudio.muted = !bgAudio.muted;
-    if (!bgAudio.muted && bgAudio.paused) bgAudio.play().catch(() => {});
+  audioToggle.addEventListener('click', async () => {
+    if (bgAudio.paused) {
+      bgAudio.muted = false;
+      try {
+        await bgAudio.play();
+      } catch (err) {
+        console.error('Could not play bg.mp3:', err);
+      }
+    } else {
+      bgAudio.pause();
+    }
     updateMuteIcon();
   });
 
   volumeSlider.addEventListener('input', (e) => {
     const val = Number(e.target.value);
     bgAudio.volume = val / 100;
-    bgAudio.muted = val === 0;
     volLabel.textContent = val + '%';
+
+    if (val === 0) {
+      bgAudio.pause();
+    } else if (bgAudio.paused) {
+      bgAudio.play().catch(err => console.error('Could not play bg.mp3:', err));
+    }
+
     updateMuteIcon();
-    if (val > 0 && bgAudio.paused) bgAudio.play().catch(() => {});
+  });
+
+  bgAudio.addEventListener('play', updateMuteIcon);
+  bgAudio.addEventListener('pause', updateMuteIcon);
+  bgAudio.addEventListener('error', () => {
+    console.error('Audio error:', bgAudio.error);
   });
 
   // hero word cycler
