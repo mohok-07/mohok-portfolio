@@ -563,7 +563,7 @@
 
 <a href="#main" class="skip-link">Skip to content</a>
 
-<audio id="bgAudio" src="bg.mp3" loop preload="auto"></audio>
+<audio id="bgAudio" loop preload="auto"></audio>
 
 <div class="audio-widget">
   <button class="audio-toggle" id="audioToggle" type="button" aria-label="Mute background music" aria-pressed="false">
@@ -949,6 +949,34 @@
 
   bgAudio.volume = 0.25;
 
+  // try a few likely filenames in case the uploaded file isn't named exactly "bg.mp3"
+  const musicCandidates = ['bg.mp3', './bg.mp3', '/bg.mp3', 'bg.mp3.mp3', './bg.mp3.mp3', '/bg.mp3.mp3'];
+  let candidateIndex = 0;
+  let musicFound = false;
+
+  function tryNextCandidate(){
+    if (candidateIndex >= musicCandidates.length) {
+      console.warn('[bg music] Could not load any of:', musicCandidates, '— check the file is uploaded next to index.html and the name matches.');
+      audioToggle.style.opacity = '0.35';
+      audioToggle.setAttribute('title', 'Music file not found — see console for details');
+      return;
+    }
+    const src = musicCandidates[candidateIndex];
+    candidateIndex++;
+    bgAudio.src = src;
+    bgAudio.load();
+  }
+
+  bgAudio.addEventListener('error', tryNextCandidate);
+  bgAudio.addEventListener('canplay', () => {
+    if (musicFound) return;
+    musicFound = true;
+    console.info('[bg music] Loaded successfully from:', bgAudio.currentSrc);
+    tryAutoplay();
+  }, { once: false });
+
+  tryNextCandidate();
+
   function updateMuteIcon(){
     const muted = bgAudio.muted || bgAudio.volume === 0;
     iconOn.style.display = muted ? 'none' : 'block';
@@ -962,7 +990,7 @@
     bgAudio.play().catch(() => {
       // autoplay blocked — start on the visitor's first interaction instead
       const startOnInteract = () => {
-        bgAudio.play().catch(() => {});
+        bgAudio.play().catch((err) => console.warn('[bg music] play() failed:', err));
         document.removeEventListener('click', startOnInteract);
         document.removeEventListener('keydown', startOnInteract);
       };
@@ -970,7 +998,6 @@
       document.addEventListener('keydown', startOnInteract, { once: true });
     });
   }
-  window.addEventListener('load', tryAutoplay);
 
   audioToggle.addEventListener('click', () => {
     bgAudio.muted = !bgAudio.muted;
